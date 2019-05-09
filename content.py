@@ -27,7 +27,9 @@ def hamming_distance(X, X_train):
     :param X_train: zbiór obiektów do których porównujemy N2xD
     :return: macierz odległości pomiędzy obiektami z "X" i "X_train" N1xN2
     """
+    print(X)
     X = X.toarray()
+    print(X)
     X_train = X_train.toarray()
     N1, D = np.shape(X)
     N2, _ = np.shape(X_train)
@@ -210,18 +212,4 @@ def model_selection_nb(X_train, X_val, y_train, y_val, a_values, b_values):
         iterowania najpierw po "a_values" [pętla zewnętrzna], a następnie
         "b_values" [pętla wewnętrzna]).
     """
-    errors = np.ones((len(a_values), len(b_values)))
-    estimated_p_y = estimate_a_priori_nb(y_train)
-    best_a = 0
-    best_b = 0
-    best_error = np.inf
-    for i in range(len(a_values)):
-        for j in range(len(b_values)):
-            error = classification_error(p_y_x_nb(estimated_p_y, estimate_p_x_y_nb(
-                X_train, y_train, a_values[i], b_values[j]), X_val), y_val)
-            errors[i][j] = error
-            if error < best_error:
-                best_a = a_values[i]
-                best_b = b_values[j]
-                best_error = error
-    return best_error, best_a, best_b, errors
+    pass
