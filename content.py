@@ -27,16 +27,15 @@ def hamming_distance(X, X_train):
     :param X_train: zbiór obiektów do których porównujemy N2xD
     :return: macierz odległości pomiędzy obiektami z "X" i "X_train" N1xN2
     """
-    print(X)
     X = X.toarray()
-    print(X)
     X_train = X_train.toarray()
     N1, D = np.shape(X)
     N2, _ = np.shape(X_train)
-    Dist = np.zeros((N1, N2))
-    for n1 in range(0, N1):
-        for n2 in range(0, N2):
-            Dist[n1, n2] = h_distance(X[n1, :], X_train[n2, :])
+
+    X_train = X_train.T
+    Dist = X.astype(int) @ X_train.astype(int)
+    Dist += (~X).astype(int) @ (~X_train).astype(int)
+    Dist = np.ones((N1, N2)) * D - Dist
     return Dist
 
 
@@ -116,11 +115,17 @@ def model_selection_knn(X_val, X_train, y_val, y_train, k_values):
     labels = sort_train_labels_knn(h_dist, y_train)
 
     errors = []
+    curr_best = 0
+
     for i in range(0, len(k_values)):
         p_y_x = p_y_x_knn(labels, k_values[i])
-        errors.append(classification_error(p_y_x, y_val))
-    best = np.argmin(errors)
-    return errors[best], k_values[best], errors
+        err = classification_error(p_y_x, y_val)
+        errors.append(err)
+
+        if err < errors[curr_best]:
+            curr_best = i
+    #best = np.argmin(errors)
+    return errors[curr_best], k_values[curr_best], errors
 
 
 def estimate_a_priori_nb(y_train):
@@ -131,6 +136,7 @@ def estimate_a_priori_nb(y_train):
     :param y_train: etykiety dla danych treningowych 1xN
     :return: wektor prawdopodobieństw a priori p(y) 1xM
     """
+    print('6')
     return np.bincount(y_train) / len(y_train)
 
 
@@ -145,7 +151,7 @@ def estimate_p_x_y_nb(X_train, y_train, a, b):
     :param b: parametr "b" rozkładu Beta
     :return: macierz prawdopodobieństw p(x|y) dla obiektów z "X_train" MxD.
     """
-
+    print('7')
     num_of_classes = 4
 
     # how many appears of word d in every appear of class K
@@ -153,16 +159,26 @@ def estimate_p_x_y_nb(X_train, y_train, a, b):
     result = np.zeros((num_of_classes, D))
 
     for i in range(0, N):
-        for j in range(0, D):
+        result[y_train[i]] += X_train[i]
+
+        """for j in range(0, D):
             if X_train[i, j] == 1:
                 result[y_train[i], j] += 1
+        """
 
     result = result + a - 1
 
     devider = np.bincount(y_train, None, num_of_classes) + a + b - 2
+    """
+    print('@@@@@@@@@@@############')
+    print(result)
+    print('^^^^^^^^^^^^^^^^')
+    print(devider)
+    """
 
-    for i in range(0, num_of_classes):
-        result[i] = result[i] / devider[i]
+    # for i in range(0, num_of_classes):
+    #result[i] = result[i] / devider[i]
+    result = np.divide(result, devider.reshape(4, 1))
 
     return result
 
@@ -177,6 +193,7 @@ def p_y_x_nb(p_y, p_x_1_y, X):
     :param X: dane dla których beda wyznaczone prawdopodobieństwa, macierz NxD
     :return: macierz prawdopodobieństw p(y|x) dla obiektów z "X" NxM
     """
+    print('8')
 
     num_of_classes = 4
     N, D = np.shape(X)
@@ -186,9 +203,9 @@ def p_y_x_nb(p_y, p_x_1_y, X):
     result = []
 
     for i in range(0, N):
-        # p(x | y)  Bernoulli
+        # p(x | y)  Bernoulli wyjaśnione w zeszycie
         p = np.prod((p_x_1_y ** X[i, ]) * (p_x_1_y_rev ** X_rev[i, ]), axis=1) * p_y
-        sum = np.sum(p)
+        sum = np.sum(p)  # prawd całkowite
         result.append(p / sum)
     return result
 
@@ -212,4 +229,30 @@ def model_selection_nb(X_train, X_val, y_train, y_val, a_values, b_values):
         iterowania najpierw po "a_values" [pętla zewnętrzna], a następnie
         "b_values" [pętla wewnętrzna]).
     """
-    pass
+
+    N2, D = np.shape(X_train)
+    N1, _ = np.shape(X_val)
+
+    # ilosc parametrow
+    a_len = np.shape(a_values)[0]
+    b_len = np.shape(b_values)[0]
+
+    a_priori = estimate_a_priori_nb(y_train)
+    errors = np.zeros((a_len, b_len))
+    best_err = np.inf
+    best_a = 0
+    best_b = 0
+
+    for i in range(0, a_len):
+        for j in range(0, b_len):
+            p_x_y = estimate_p_x_y_nb(X_train, y_train, a_values[i], b_values[j])
+            p_y_x = p_y_x_nb(a_priori, p_x_y, X_val)
+            err = classification_error(p_y_x, y_val)
+            errors[i, j] = err
+
+            if err < best_err:
+                best_a = i
+                best_b = j
+                best_err = err
+
+    return best_err, a_values[best_a], b_values[best_b], errors
